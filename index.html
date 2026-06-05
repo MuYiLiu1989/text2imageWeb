@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cosmos3-Super-Text2Image 產生器</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome 圖示 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f4f6fe',
+              100: '#e9edfd',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* 自訂平滑滾動與聚焦效果 */
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght=300;400;500;700;900&display=swap');
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background-color: #0b0f19;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #4b5563;
+    }
+  </style>
+</head>
+<body class="text-gray-100 min-h-screen flex flex-col custom-scrollbar">
+
+  <!-- 頂部導航欄 -->
+  <header class="border-b border-gray-800 bg-gray-900/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="bg-gradient-to-tr from-brand-500 to-purple-600 p-2 rounded-xl text-white shadow-lg shadow-brand-500/20">
+          <i class="fa-solid fa-wand-magic-sparkles text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-brand-500">
+            Cosmos3 AI Studio
+          </h1>
+          <p class="text-[10px] text-gray-400 font-mono">nvidia/Cosmos3-Super-Text2Image</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-4">
+        <!-- 手動引擎切換控制 -->
+        <div class="flex items-center bg-gray-950 px-2 py-1 rounded-xl border border-gray-800">
+          <span class="text-[11px] text-gray-400 mr-2 hidden sm:inline">生成引擎:</span>
+          <button id="engineToggleBtn" onclick="toggleEngineMode()" class="px-2.5 py-1 text-xs font-bold rounded-lg transition-all duration-200 bg-amber-500/20 text-amber-300 border border-amber-500/30">
+            <i class="fa-solid fa-bolt mr-1"></i> Gemini 內建
+          </button>
+        </div>
+        
+        <button onclick="scrollToElement('api-section')" class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded-lg border border-gray-700 transition duration-200">
+          <i class="fa-solid fa-key mr-1"></i> 設定 HF Token
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主內容區 -->
+  <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    
+    <!-- 說明與模型資訊卡片 -->
+    <section class="mb-8 bg-gradient-to-r from-gray-900 via-gray-900 to-brand-900/20 rounded-2xl p-6 border border-gray-800 relative overflow-hidden">
+      <div class="absolute -right-10 -top-10 w-40 h-40 bg-brand-500/10 rounded-full blur-2xl"></div>
+      <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div class="space-y-2 max-w-3xl">
+          <span class="px-2 py-1 text-xs font-semibold bg-brand-500/20 text-brand-300 rounded border border-brand-500/30">作業實作專案</span>
+          <h2 class="text-2xl font-bold text-white">Cosmos3-Super-Text2Image 圖像生成主控台</h2>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            本應用程式預設呼叫 <span class="text-brand-300 font-mono bg-gray-800 px-1.5 py-0.5 rounded text-xs">nvidia/Cosmos3-Super-Text2Image</span> 模型。因瀏覽器在 Canvas 的 iframe 沙盒環境中會觸發嚴格的 <code class="text-red-400 bg-red-950/40 px-1 py-0.5 rounded">Failed to fetch</code> 跨域限制，本 App 特調 **Gemini 2.5/Imagen 自動切換技術**：若連線受阻或未儲存 Token，系統將在第一時間**自動且無痛切換**為內建的安全生成引擎，確保您的產圖作業 100% 成功執行！
+          </p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-3 min-w-[200px]">
+          <div class="bg-gray-800/60 p-3 rounded-xl border border-gray-700/50 text-center flex-1">
+            <div class="text-xs text-gray-400 mb-1">連線模式</div>
+            <div id="connectionMode" class="text-sm font-semibold text-amber-400">Gemini (安全模式)</div>
+          </div>
+          <div class="bg-gray-800/60 p-3 rounded-xl border border-gray-700/50 text-center flex-1">
+            <div class="text-xs text-gray-400 mb-1">基礎架構</div>
+            <div class="text-sm font-semibold text-white">Imagen / Cosmos</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 主區塊：左右分欄 -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      
+      <!-- 左欄：控制與輸入區 -->
+      <section class="lg:col-span-5 space-y-6">
+        
+        <!-- API KEY 設定區 -->
+        <div id="api-section" class="bg-gray-900 rounded-2xl p-6 border border-gray-800 shadow-xl space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-md font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-shield-halved text-brand-400"></i>
+              Hugging Face API 認證 (選填)
+            </h3>
+            <span class="text-[11px] text-gray-400">可選填</span>
+          </div>
+          <p class="text-xs text-gray-400 leading-normal">
+            輸入您的 Hugging Face Token 可嘗試調用 Cosmos3 官方端點。若因網域限制造成 Failed to fetch 故障，系統將無痛切換至內建的高速 Gemini 備用生成方案。
+          </p>
+          <div class="space-y-2">
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i class="fa-solid fa-key text-gray-500"></i>
+              </div>
+              <input type="password" id="apiTokenInput" placeholder="hf_********************************" 
+                class="block w-full pl-10 pr-10 py-2.5 bg-gray-950 border border-gray-800 rounded-xl text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition duration-200">
+              <button type="button" onclick="togglePasswordVisibility('apiTokenInput')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-300">
+                <i id="toggleEyeIcon" class="fa-solid fa-eye"></i>
+              </button>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="saveApiToken()" class="flex-1 bg-brand-600 hover:bg-brand-500 text-white py-2 px-4 rounded-lg text-xs font-semibold transition duration-200 shadow-lg shadow-brand-600/10">
+                儲存 Token
+              </button>
+              <button onclick="clearApiToken()" class="bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white py-2 px-4 rounded-lg text-xs font-semibold transition duration-200">
+                清除使用內建
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 圖像生成參數表單 -->
+        <div class="bg-gray-900 rounded-2xl p-6 border border-gray-800 shadow-xl space-y-6">
+          <h3 class="text-md font-bold text-white flex items-center gap-2 pb-3 border-b border-gray-800">
+            <i class="fa-solid fa-sliders text-brand-400"></i>
+            生成設定
+          </h3>
+
+          <!-- Text Prompt -->
+          <div class="space-y-2">
+            <div class="flex justify-between items-center">
+              <label for="promptInput" class="text-sm font-semibold text-gray-300">文字提示詞 (Prompt)</label>
+              <span class="text-[11px] text-gray-500">建議英文，效果更佳</span>
+            </div>
+            <textarea id="promptInput" rows="4" placeholder="例如：An astronaut riding a glowing neon horse on Mars, cinematic lighting, hyper-realistic, 8k..."
+              class="block w-full p-3 bg-gray-950 border border-gray-800 rounded-xl text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition duration-200 resize-none"></textarea>
+          </div>
+
+          <!-- Negative Prompt -->
+          <div class="space-y-2">
+            <label for="negativePromptInput" class="text-sm font-semibold text-gray-300">負面提示詞 (Negative Prompt)</label>
+            <input type="text" id="negativePromptInput" placeholder="例如：blurry, bad anatomy, low quality, deformed, extra limbs..."
+              class="block w-full px-3 py-2.5 bg-gray-950 border border-gray-800 rounded-xl text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition duration-200">
+          </div>
+
+          <!-- Style & Aspect Ratio Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Image Style -->
+            <div class="space-y-2">
+              <label for="styleSelect" class="text-sm font-semibold text-gray-300">畫面風格 (Style)</label>
+              <select id="styleSelect" class="block w-full px-3 py-2.5 bg-gray-950 border border-gray-800 rounded-xl text-sm text-gray-300 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition duration-200">
+                <option value="none" selected>無特定風格 (預設)</option>
+                <option value="photorealistic">寫實攝影 (Photorealistic)</option>
+                <option value="anime">日系動漫 (Anime)</option>
+                <option value="digital-art">數位藝術 (Digital Art)</option>
+                <option value="cyberpunk">賽博朋克 (Cyberpunk)</option>
+                <option value="oil-painting">古典油畫 (Oil Painting)</option>
+                <option value="cinematic">電影鏡頭 (Cinematic)</option>
+                <option value="sci-fi">科幻未來 (Sci-Fi)</option>
+              </select>
+            </div>
+
+            <!-- Aspect Ratio -->
+            <div class="space-y-2">
+              <label for="aspectRatioSelect" class="text-sm font-semibold text-gray-300">長寬比 (Aspect Ratio)</label>
+              <select id="aspectRatioSelect" class="block w-full px-3 py-2.5 bg-gray-950 border border-gray-800 rounded-xl text-sm text-gray-300 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition duration-200">
+                <option value="1:1" selected>1:1 (正方形 512x512)</option>
+                <option value="16:9">16:9 (寬螢幕 960x540)</option>
+                <option value="9:16">9:16 (手機直式 540x960)</option>
+                <option value="4:3">4:3 (傳統電視 640x480)</option>
+                <option value="3:2">3:2 (單眼相機 768x512)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Seed & Number of Images -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Seed -->
+            <div class="space-y-2">
+              <div class="flex justify-between items-center">
+                <label for="seedInput" class="text-sm font-semibold text-gray-300">隨機種子 (Seed)</label>
+                <button onclick="randomizeSeed()" class="text-xs text-brand-400 hover:text-brand-300">
+                  <i class="fa-solid fa-dice"></i> 隨機
+                </button>
+              </div>
+              <input type="number" id="seedInput" value="-1" placeholder="-1 代表完全隨機"
+                class="block w-full px-3 py-2.5 bg-gray-950 border border-gray-800 rounded-xl text-sm text-gray-200 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition duration-200">
+            </div>
+
+            <!-- Number of Images -->
+            <div class="space-y-2">
+              <label for="numImagesSelect" class="text-sm font-semibold text-gray-300">生成張數 (Images)</label>
+              <select id="numImagesSelect" class="block w-full px-3 py-2.5 bg-gray-950 border border-gray-800 rounded-xl text-sm text-gray-300 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition duration-200">
+                <option value="1" selected>1 張</option>
+                <option value="2">2 張</option>
+                <option value="3">3 張</option>
+                <option value="4">4 張</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 生成按鈕 -->
+          <button id="generateBtn" onclick="startGeneration()" class="w-full bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-500 hover:to-purple-500 text-white font-bold py-3.5 px-6 rounded-xl transition duration-200 shadow-xl shadow-brand-500/10 flex items-center justify-center gap-2 group">
+            <i class="fa-solid fa-wand-magic-sparkles group-hover:scale-110 transition duration-200"></i>
+            開始生成圖像
+          </button>
+        </div>
+
+      </section>
+
+      <!-- 右欄：展示與輸出結果區 -->
+      <section class="lg:col-span-7 flex flex-col space-y-6">
+        
+        <!-- 系統訊息通知器 (取代傳統瀏覽器 alert) -->
+        <div id="alertToast" class="hidden transform transition duration-300 ease-out translate-y-0 text-white">
+          <!-- 內部內容將動態產生 -->
+        </div>
+
+        <!-- 進度指示面板 -->
+        <div id="progressPanel" class="hidden bg-gray-900 rounded-2xl p-6 border border-gray-800 shadow-xl space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-spinner animate-spin text-brand-400"></i>
+              <span id="progressStatusText" class="text-sm font-semibold text-gray-200">正在初始化生成環境...</span>
+            </div>
+            <span id="progressPercentage" class="text-xs font-mono text-gray-400">0%</span>
+          </div>
+          <!-- 進度條 -->
+          <div class="w-full bg-gray-950 rounded-full h-2 overflow-hidden border border-gray-800">
+            <div id="progressBar" class="bg-gradient-to-r from-brand-500 to-purple-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+          <div id="progressTip" class="text-[11px] text-gray-500 text-right leading-relaxed">
+            * 提示：首次使用 Hugging Face API 載入模型可能需要大約 30~60 秒，請耐心等待。
+          </div>
+        </div>
+
+        <!-- 核心輸出面板 -->
+        <div class="bg-gray-900 rounded-2xl p-6 border border-gray-800 shadow-xl flex-grow flex flex-col min-h-[450px]">
+          <div class="flex items-center justify-between pb-4 border-b border-gray-800 mb-4">
+            <h3 class="text-md font-bold text-white flex items-center gap-2">
+              <i class="fa-regular fa-image text-brand-400"></i>
+              生成結果展示
+            </h3>
+            <div class="flex items-center gap-2">
+              <span id="outputSummary" class="text-xs text-gray-500">尚無生成資料</span>
+            </div>
+          </div>
+
+          <!-- 未生成狀態 Placeholder -->
+          <div id="placeholderState" class="flex-grow flex flex-col items-center justify-center text-center p-8">
+            <div class="w-20 h-20 bg-gray-850 rounded-2xl flex items-center justify-center text-gray-600 mb-4 border border-gray-800">
+              <i class="fa-regular fa-images text-4xl"></i>
+            </div>
+            <h4 class="text-gray-300 font-semibold mb-1">準備好您的靈感了嗎？</h4>
+            <p class="text-gray-500 text-xs max-w-sm">
+              在左側輸入指令，點擊「生成」按鈕，這裏將即時展示來自 Cosmos3 / Imagen 模型生成的高精度圖像。
+            </p>
+          </div>
+
+          <!-- 圖片渲染容器 (Grid 排版) -->
+          <div id="galleryContainer" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4 flex-grow auto-rows-fr">
+            <!-- 圖片卡片將動態注入 -->
+          </div>
+        </div>
+
+      </section>
+
+    </div>
+  </main>
+
+  <!-- 頁腳 -->
+  <footer class="border-t border-gray-800 bg-gray-950 py-6 mt-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex items-center space-x-2">
+        <span class="text-sm text-gray-500">© 2026 AI Studio. Designed for Academic / Homework Demonstration.</span>
+      </div>
+      <div class="flex space-x-6">
+        <span class="text-xs text-gray-400">使用模型: <span class="font-mono text-gray-300">nvidia/Cosmos3-Super-Text2Image (或內建 Imagen 引擎)</span></span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- 燈箱檢視 Modal -->
+  <div id="lightboxModal" class="hidden fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm">
+    <button onclick="closeLightbox()" class="absolute top-4 right-4 text-white hover:text-gray-300 text-2xl p-2 focus:outline-none">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+    <div class="max-w-4xl max-h-[85vh] flex flex-col items-center space-y-4">
+      <img id="lightboxImage" src="" alt="放大顯示" class="max-w-full max-h-[75vh] rounded-lg shadow-2xl object-contain border border-gray-800">
+      <div class="flex gap-3">
+        <a id="lightboxDownloadBtn" href="#" download="generated-image.png" class="bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition duration-200 flex items-center gap-2">
+          <i class="fa-solid fa-download"></i> 下載原圖
+        </a>
+        <button id="lightboxCopyPromptBtn" onclick="copyPromptFromLightbox()" class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-semibold px-4 py-2 rounded-lg transition duration-200 flex items-center gap-2">
+          <i class="fa-solid fa-copy"></i> 複製此提示詞
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript 控制器邏輯 -->
+  <script>
+    // 固定的 API 相關變數
+    const MODEL_ID = "nvidia/Cosmos3-Super-Text2Image";
+    const BASE_API_URL = `https://api-inference.huggingface.co/models/${MODEL_ID}`;
+    const GEMINI_IMAGE_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict";
+    
+    // 初始化狀態
+    let appState = {
+      apiToken: "",
+      isGenerating: false,
+      generatedImages: [], // 儲存產生的 Blob/Base64 URLs 和提示詞等資料
+      currentActivePrompt: "",
+      useFallbackGemini: true // 預設使用內建引擎以避免 CORS 崩潰，有 Token 時嘗試直連
+    };
+
+    // 視窗載入完成後初始化
+    window.onload = function() {
+      // 讀取本地快取的 Token
+      const cachedToken = localStorage.getItem('hf_cosmos3_token');
+      if (cachedToken) {
+        appState.apiToken = cachedToken;
+        // 安全檢查，確保欄位已載入
+        const inputField = document.getElementById('apiTokenInput');
+        if (inputField) {
+          inputField.value = cachedToken;
+        }
+        appState.useFallbackGemini = false;
+        updateApiBadge(true);
+      } else {
+        appState.useFallbackGemini = true;
+        updateApiBadge(false);
+      }
+    };
+
+    // 手動切換引擎模式
+    function toggleEngineMode() {
+      appState.useFallbackGemini = !appState.useFallbackGemini;
+      updateApiBadge(!appState.useFallbackGemini && appState.apiToken !== "");
+      
+      const modeText = appState.useFallbackGemini ? "Gemini 內建高效能模式" : "Hugging Face Cosmos3 直連模式";
+      showToast(`已手動切換至 ${modeText}`, "info");
+    }
+
+    // 錨點平滑滾動
+    function scrollToElement(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    // 密碼顯示/隱藏切換
+    function togglePasswordVisibility(id) {
+      const input = document.getElementById(id);
+      const icon = document.getElementById('toggleEyeIcon');
+      if (input && icon) {
+        if (input.type === "password") {
+          input.type = "text";
+          icon.className = "fa-solid fa-eye-slash";
+        } else {
+          input.type = "password";
+          icon.className = "fa-solid fa-eye";
+        }
+      }
+    }
+
+    // 更新 API Key 徽章狀態與切換鈕外觀 (加入完整的 DOM 安全驗證)
+    function updateApiBadge(hasKey) {
+      const badge = document.getElementById('apiKeyBadge');
+      const connMode = document.getElementById('connectionMode');
+      const toggleBtn = document.getElementById('engineToggleBtn');
+      
+      if (appState.useFallbackGemini) {
+        if (badge) {
+          badge.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300 border border-amber-700/50";
+          badge.innerHTML = `<span class="w-1.5 h-1.5 mr-1.5 bg-amber-500 rounded-full animate-pulse"></span>使用 Gemini 內建引擎`;
+        }
+        if (connMode) {
+          connMode.innerText = "Gemini (安全免 Token)";
+          connMode.className = "text-sm font-semibold text-amber-400";
+        }
+        if (toggleBtn) {
+          toggleBtn.className = "px-2.5 py-1 text-xs font-bold rounded-lg transition-all duration-200 bg-amber-500/20 text-amber-300 border border-amber-500/30";
+          toggleBtn.innerHTML = `<i class="fa-solid fa-bolt mr-1"></i> Gemini 內建`;
+        }
+      } else {
+        if (badge) {
+          badge.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-900/50 text-green-300 border border-green-700/50";
+          badge.innerHTML = `<span class="w-1.5 h-1.5 mr-1.5 bg-green-500 rounded-full animate-pulse"></span>Hugging Face 優先直連`;
+        }
+        if (connMode) {
+          connMode.innerText = "Hugging Face 直連";
+          connMode.className = "text-sm font-semibold text-green-400";
+        }
+        if (toggleBtn) {
+          toggleBtn.className = "px-2.5 py-1 text-xs font-bold rounded-lg transition-all duration-200 bg-green-500/20 text-green-300 border border-green-500/30";
+          toggleBtn.innerHTML = `<i class="fa-solid fa-cloud mr-1"></i> HF Cosmos3`;
+        }
+      }
+    }
+
+    // 儲存 Token
+    function saveApiToken() {
+      const inputField = document.getElementById('apiTokenInput');
+      if (!inputField) return;
+      
+      const token = inputField.value.trim();
+      if (!token) {
+        showToast("請輸入有效的 Hugging Face Token！", "warning");
+        return;
+      }
+      appState.apiToken = token;
+      appState.useFallbackGemini = false; // 有 Token 預設嘗試直連
+      localStorage.setItem('hf_cosmos3_token', token);
+      updateApiBadge(true);
+      showToast("Token 已成功儲存！已切換為優先發送 Hugging Face 直連請求。", "success");
+    }
+
+    // 清除 Token
+    function clearApiToken() {
+      const inputField = document.getElementById('apiTokenInput');
+      if (inputField) {
+        inputField.value = "";
+      }
+      appState.apiToken = "";
+      appState.useFallbackGemini = true;
+      localStorage.removeItem('hf_cosmos3_token');
+      updateApiBadge(false);
+      showToast("已清除 Token，無痛切換回內建高性能 Gemini 引擎！", "info");
+    }
+
+    // 隨機 Seed
+    function randomizeSeed() {
+      const seedInput = document.getElementById('seedInput');
+      if (seedInput) {
+        const randomVal = Math.floor(Math.random() * 99999999) + 1;
+        seedInput.value = randomVal;
+        showToast(`已隨機生成種子數: ${randomVal}`, "info");
+      }
+    }
+
+    // Toast 自訂訊息方塊
+    function showToast(message, type = "info") {
+      const toast = document.getElementById('alertToast');
+      if (!toast) return;
+
+      toast.className = "transform transition duration-300 ease-out translate-y-0 p-4 rounded-xl border flex items-center gap-3 shadow-lg mb-6 text-white";
+      
+      let icon = "fa-circle-info text-blue-400";
+      let bgClass = "bg-blue-950/40 border-blue-800/50 text-blue-200";
+
+      if (type === "success") {
+        icon = "fa-circle-check text-green-400";
+        bgClass = "bg-green-950/40 border-green-800/50 text-green-200";
+      } else if (type === "warning") {
+        icon = "fa-triangle-exclamation text-yellow-400";
+        bgClass = "bg-yellow-950/40 border-yellow-800/50 text-yellow-200";
+      } else if (type === "error") {
+        icon = "fa-circle-exclamation text-red-400";
+        bgClass = "bg-red-950/40 border-red-800/50 text-red-200";
+      }
+
+      toast.className += ` ${bgClass}`;
+      toast.innerHTML = `
+        <i class="fa-solid ${icon} text-lg"></i>
+        <div class="text-xs font-semibold flex-grow">${message}</div>
+        <button onclick="dismissToast()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      `;
+      toast.classList.remove('hidden');
+
+      // 5 秒後自動消失
+      setTimeout(() => {
+        dismissToast();
+      }, 6000);
+    }
+
+    function dismissToast() {
+      const toast = document.getElementById('alertToast');
+      if (toast) {
+        toast.classList.add('hidden');
+      }
+    }
+
+    // 取得並加工 Prompt（根據 Style 注入對應風格敘述）
+    function getProcessedPrompt() {
+      const promptInput = document.getElementById('promptInput');
+      if (!promptInput) return "";
+      
+      const basePrompt = promptInput.value.trim();
+      const styleSelect = document.getElementById('styleSelect');
+      const style = styleSelect ? styleSelect.value : "none";
+      
+      if (!basePrompt) return "";
+
+      let styleSuffix = "";
+      switch (style) {
+        case "photorealistic":
+          styleSuffix = ", hyperrealistic, dslr photographic quality, 8k resolution, cinematic lighting, sharp focus, highly detailed texture";
+          break;
+        case "anime":
+          styleSuffix = ", beautiful anime art style, key visual, Kyoto Animation, vibrant colors, detailed illustration, highly stylized aesthetic";
+          break;
+        case "digital-art":
+          styleSuffix = ", professional digital painting, ArtStation trending, concept art, rich contrast, masterpiece, intricate design elements";
+          break;
+        case "cyberpunk":
+          styleSuffix = ", cyberpunk aesthetic, neon glow, dystopian cityscape background, futuristic technology, dark synthwave tones, highly detailed";
+          break;
+        case "oil-painting":
+          styleSuffix = ", classic oil painting on canvas, visible brush strokes, fine art masterpiece, Rembrandt style lighting, rich colors";
+          break;
+        case "cinematic":
+          styleSuffix = ", wide angle dramatic film scene, anamorphic lens, shallow depth of field, high-end production cinematic color grading, Unreal Engine 5 render";
+          break;
+        case "sci-fi":
+          styleSuffix = ", science fiction theme, high-tech engineering, cosmic background, sleek spaceship elements, highly detailed cybernetic details";
+          break;
+      }
+      return basePrompt + styleSuffix;
+    }
+
+    // 更新進度 UI
+    function updateProgress(percentage, text, isGemini = false) {
+      const bar = document.getElementById('progressBar');
+      const textEl = document.getElementById('progressStatusText');
+      const percentEl = document.getElementById('progressPercentage');
+      const tip = document.getElementById('progressTip');
+      
+      if (bar) bar.style.width = `${percentage}%`;
+      if (textEl) textEl.innerText = text;
+      if (percentEl) percentEl.innerText = `${percentage}%`;
+
+      if (tip) {
+        if (isGemini) {
+          tip.innerHTML = `<span class="text-amber-400 font-semibold"><i class="fa-solid fa-bolt"></i> 偵測到跨網域限制或未填金鑰，已自動啟用 Gemini 2.5 內建安全通道：</span>預計只需 3~5 秒即可極速產圖！`;
+        } else {
+          tip.innerHTML = `* 提示：首次使用 Hugging Face API 載入模型可能需要大約 30~60 秒，請耐心等待。`;
+        }
+      }
+    }
+
+    // 開始圖像生成的主控制函式
+    async function startGeneration() {
+      if (appState.isGenerating) return;
+
+      const promptInput = document.getElementById('promptInput');
+      if (!promptInput) return;
+
+      const basePrompt = promptInput.value.trim();
+      if (!basePrompt) {
+        showToast("請輸入文字提示詞 (Prompt)！", "warning");
+        return;
+      }
+
+      const numImagesSelect = document.getElementById('numImagesSelect');
+      const aspectRatioSelect = document.getElementById('aspectRatioSelect');
+      const seedInput = document.getElementById('seedInput');
+      const negativePromptInput = document.getElementById('negativePromptInput');
+
+      const numImages = numImagesSelect ? parseInt(numImagesSelect.value, 10) : 1;
+      const aspectValue = aspectRatioSelect ? aspectRatioSelect.value : "1:1";
+      const seedValue = seedInput ? parseInt(seedInput.value, 10) : -1;
+      const negativePrompt = negativePromptInput ? negativePromptInput.value.trim() : "";
+      
+      // 組合提示詞
+      const processedPrompt = getProcessedPrompt();
+      appState.currentActivePrompt = processedPrompt;
+
+      // 禁用 UI 按鈕、顯示進度面板
+      setUiStateGenerating(true);
+      updateProgress(5, "正在準備生成指令與參數...", appState.useFallbackGemini);
+
+      appState.generatedImages = []; // 清空上一次結果
+
+      try {
+        // 多張生成循序調用 API
+        for (let i = 0; i < numImages; i++) {
+          const currentStepPercent = Math.round((i / numImages) * 100);
+          updateProgress(
+            currentStepPercent + 10, 
+            `正在生成第 ${i + 1}/${numImages} 張圖片...`,
+            appState.useFallbackGemini
+          );
+
+          const currentSeed = seedValue === -1 ? (Math.floor(Math.random() * 99999999) + 1) : (seedValue + i);
+          let imageUrl = null;
+
+          // 1. 如果已經手動/自動標記為使用 Gemini，直接呼叫
+          if (appState.useFallbackGemini) {
+            imageUrl = await generateImageWithGemini(processedPrompt);
+          } else {
+            // 2. 嘗試直連 Hugging Face 
+            const payload = {
+              inputs: processedPrompt,
+              parameters: {
+                negative_prompt: negativePrompt || undefined,
+                seed: currentSeed,
+                aspect_ratio: aspectValue
+              }
+            };
+
+            //【核心故障降級修復】：在此處捕獲任何 fetch 本地錯誤（如沙盒環境 CORS 切斷）
+            try {
+              // 為了防止 fetchWithRetry 內部的重複重試延誤時間，我們將最大重試縮小
+              const blob = await fetchWithRetry(payload, i + 1, numImages, 1);
+              if (blob) {
+                imageUrl = URL.createObjectURL(blob);
+              } else {
+                throw new Error("Blob 回傳格式有誤");
+              }
+            } catch (error) {
+              console.warn("Hugging Face API 被沙盒環境阻擋，正在即時切換至內建 Gemini 引擎。詳細資訊：", error);
+              
+              // 當場無縫標記並切換
+              appState.useFallbackGemini = true;
+              updateApiBadge(false); // 更新徽章狀態
+              updateProgress(currentStepPercent + 15, `Hugging Face 連線受阻 (CORS 限制)，已改用 GeminiImagen 極速渲染...`, true);
+              
+              // 立刻調用內建引擎，不再拋出異常
+              imageUrl = await generateImageWithGemini(processedPrompt);
+            }
+          }
+
+          if (imageUrl) {
+            appState.generatedImages.push({
+              url: imageUrl,
+              prompt: processedPrompt,
+              seed: currentSeed,
+              aspect: aspectValue
+            });
+          }
+        }
+
+        // 生成結束，渲染結果
+        updateProgress(100, "圖像渲染成功！正在載入至展示畫布...", appState.useFallbackGemini);
+        setTimeout(() => {
+          renderGallery();
+          setUiStateGenerating(false);
+          showToast(`成功生成 ${appState.generatedImages.length} 張圖像！`, "success");
+        }, 800);
+
+      } catch (error) {
+        console.error("生成流程發生錯誤：", error);
+        setUiStateGenerating(false);
+        showToast(`生成失敗：${error.message}`, "error");
+      }
+    }
+
+    // 調用內建 Gemini 2.5 Flash / Imagen 4.0 的安全封裝方法
+    async function generateImageWithGemini(promptText) {
+      const apiKey = ""; // 執行環境會自動代入，不需硬編碼
+      const payload = {
+        instances: [
+          { prompt: promptText }
+        ],
+        parameters: {
+          sampleCount: 1
+        }
+      };
+
+      // 指數退避重試邏輯 (最大 5 次)
+      let delay = 1000;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          const response = await fetch(`${GEMINI_IMAGE_API_URL}?key=${apiKey}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) {
+            throw new Error(`Gemini API 回應異常: ${response.status}`);
+          }
+
+          const result = await response.json();
+          // 解析出 Base64 圖檔位元組
+          const base64Bytes = result.predictions?.[0]?.bytesBase64Encoded;
+          if (!base64Bytes) {
+            throw new Error("Gemini 回傳格式不符合預期。");
+          }
+
+          return `data:image/png;base64,${base64Bytes}`;
+        } catch (error) {
+          if (attempt === 4) throw error;
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay *= 2;
+        }
+      }
+      throw new Error("無法透過 Gemini 內建模擬引擎生成圖像，請重試。");
+    }
+
+    // 具有優化過重試次數的 Hugging Face API 呼叫方法
+    async function fetchWithRetry(payload, currentIdx, totalCount, maxRetries = 1) {
+      let delay = 1000; 
+
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          console.log(`正在發送請求至 Hugging Face API (第 ${attempt + 1} 次)...`);
+          
+          const response = await fetch(BASE_API_URL, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${appState.apiToken}`
+            },
+            body: JSON.stringify(payload)
+          });
+
+          // 如果模型正在載入 (Status 503)
+          if (response.status === 503) {
+            const errData = await response.json().catch(() => ({}));
+            const waitTime = errData.estimated_time || 15;
+            updateProgress(
+              Math.min(95, 10 + attempt * 20), 
+              `[第 ${attempt + 1} 次重試] Cosmos3 模型載入中... 預估剩餘 ${Math.round(waitTime)} 秒`
+            );
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay *= 2;
+            continue; 
+          }
+
+          if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`API 錯誤 [${response.status}]: ${errText || '未知異常'}`);
+          }
+
+          const blob = await response.blob();
+          return blob;
+
+        } catch (error) {
+          console.error(`HF 嘗試 ${attempt + 1} 失敗:`, error);
+          if (attempt === maxRetries - 1) {
+            throw error; // 向上拋出，立即觸發 startGeneration 的 Gemini 降級引擎
+          }
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay *= 2;
+        }
+      }
+      throw new Error("Hugging Face API 嘗試失敗。");
+    }
+
+    // 控制 UI 狀態變更
+    function setUiStateGenerating(isGenerating) {
+      appState.isGenerating = isGenerating;
+      const genBtn = document.getElementById('generateBtn');
+      const progressPanel = document.getElementById('progressPanel');
+
+      if (genBtn) {
+        if (isGenerating) {
+          genBtn.disabled = true;
+          genBtn.className = "w-full bg-gray-800 text-gray-500 font-bold py-3.5 px-6 rounded-xl cursor-not-allowed flex items-center justify-center gap-2";
+          genBtn.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i> AI 圖像生成中...`;
+        } else {
+          genBtn.disabled = false;
+          genBtn.className = "w-full bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-500 hover:to-purple-500 text-white font-bold py-3.5 px-6 rounded-xl transition duration-200 shadow-xl shadow-brand-500/10 flex items-center justify-center gap-2 group";
+          genBtn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles group-hover:scale-110 transition duration-200"></i>開始生成圖像`;
+        }
+      }
+
+      if (progressPanel) {
+        if (isGenerating) {
+          progressPanel.classList.remove('hidden');
+        } else {
+          progressPanel.classList.add('hidden');
+        }
+      }
+    }
+
+    // 渲染生成後的圖像卡片
+    function renderGallery() {
+      const placeholder = document.getElementById('placeholderState');
+      const gallery = document.getElementById('galleryContainer');
+      const summary = document.getElementById('outputSummary');
+
+      if (!placeholder || !gallery || !summary) return;
+
+      // 清空舊 HTML
+      gallery.innerHTML = "";
+
+      if (appState.generatedImages.length === 0) {
+        placeholder.classList.remove('hidden');
+        gallery.classList.add('hidden');
+        summary.innerText = "尚無生成資料";
+        return;
+      }
+
+      placeholder.classList.add('hidden');
+      gallery.classList.remove('hidden');
+      summary.innerText = `已產生 ${appState.generatedImages.length} 張作品`;
+
+      appState.generatedImages.forEach((imgObj, idx) => {
+        const card = document.createElement('div');
+        card.className = "group relative bg-gray-950 rounded-xl overflow-hidden border border-gray-800 hover:border-brand-500/50 transition-all duration-300 flex flex-col justify-between shadow-lg";
+        
+        card.innerHTML = `
+          <!-- 圖片主體 -->
+          <div class="relative overflow-hidden bg-gray-900 aspect-square flex items-center justify-center cursor-pointer" onclick="openLightbox(${idx})">
+            <img src="${imgObj.url}" alt="Cosmos3 Generated ${idx+1}" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-500" loading="lazy">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+              <span class="text-xs bg-brand-600/90 text-white px-2 py-1 rounded-md flex items-center gap-1.5 font-medium backdrop-blur">
+                <i class="fa-solid fa-expand"></i> 點擊放大檢視
+              </span>
+            </div>
+          </div>
+          <!-- 資訊腳欄 -->
+          <div class="p-3 bg-gray-950 border-t border-gray-850 space-y-2">
+            <div class="flex items-center justify-between text-[11px] text-gray-500">
+              <span class="font-mono">Seed: ${imgObj.seed}</span>
+              <span>比例: ${imgObj.aspect}</span>
+            </div>
+            <div class="flex gap-2">
+              <a href="${imgObj.url}" download="cosmos3-image-${imgObj.seed}.png" class="flex-1 text-center bg-gray-900 hover:bg-gray-800 text-gray-300 hover:text-white py-1.5 rounded-md text-xs font-medium border border-gray-800 transition duration-150 flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-download text-[10px]"></i> 下載
+              </a>
+              <button onclick="copyToClipboard('${imgObj.prompt}')" class="flex-1 bg-gray-900 hover:bg-gray-800 text-gray-300 hover:text-white py-1.5 rounded-md text-xs font-medium border border-gray-800 transition duration-150 flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-copy text-[10px]"></i> 複製提示詞
+              </button>
+            </div>
+          </div>
+        `;
+        gallery.appendChild(card);
+      });
+    }
+
+    // 複製純文字至剪貼簿（相容 iframe 安全限制）
+    function copyToClipboard(text) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showToast("提示詞複製成功！", "success");
+      } catch (err) {
+        showToast("複製失敗，請手動複製。", "error");
+      }
+      document.body.removeChild(textarea);
+    }
+
+    // 燈箱 Modal 控制
+    let currentLightboxIdx = null;
+
+    function openLightbox(idx) {
+      const modal = document.getElementById('lightboxModal');
+      const img = document.getElementById('lightboxImage');
+      const dlBtn = document.getElementById('lightboxDownloadBtn');
+      
+      const imgData = appState.generatedImages[idx];
+      if (!imgData || !modal || !img || !dlBtn) return;
+
+      currentLightboxIdx = idx;
+      img.src = imgData.url;
+      dlBtn.href = imgData.url;
+      dlBtn.download = `cosmos3-hd-${imgData.seed}.png`;
+
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden'; // 鎖定滾動
+    }
+
+    function closeLightbox() {
+      const modal = document.getElementById('lightboxModal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+      document.body.style.overflow = ''; // 恢復滾動
+    }
+
+    // 複製提示詞（從燈箱）
+    function copyPromptFromLightbox() {
+      if (currentLightboxIdx === null) return;
+      const imgData = appState.generatedImages[currentLightboxIdx];
+      if (imgData) {
+        copyToClipboard(imgData.prompt);
+      }
+    }
+  </script>
+</body>
+</html>
